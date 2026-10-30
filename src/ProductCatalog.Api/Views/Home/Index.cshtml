@@ -1,0 +1,340 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Product Management Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .navbar-brand { font-weight: 700; letter-spacing: -0.02em; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06); }
+        .badge-auth { font-size: 0.8rem; padding: 0.45em 0.75em; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">ProductCatalog Portal</a>
+            <div class="d-flex align-items-center gap-3">
+                <span id="authStatusBadge" class="badge bg-secondary badge-auth">Guest (Read-Only)</span>
+                <button id="btnLogout" class="btn btn-outline-light btn-sm d-none" onclick="logout()">Logout</button>
+                <a href="/swagger" target="_blank" class="btn btn-info btn-sm text-dark fw-semibold">Swagger API Docs</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        <div id="alertContainer"></div>
+
+        <div class="row g-4">
+            <!-- Left Column: Auth & Product Form -->
+            <div class="col-lg-4">
+                <!-- JWT Authentication Card -->
+                <div class="card mb-4" id="authCard">
+                    <div class="card-header bg-white fw-bold py-3">1. JWT Authentication</div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">Default seeded account: <code>admin</code> / <code>Admin@123</code></p>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Username</label>
+                            <input type="text" id="authUsername" class="form-control form-control-sm" value="admin" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Email (for Register)</label>
+                            <input type="email" id="authEmail" class="form-control form-control-sm" placeholder="user@@@example.com" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Password</label>
+                            <input type="password" id="authPassword" class="form-control form-control-sm" value="Admin@123" />
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm flex-fill" onclick="login()">Login</button>
+                            <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="register()">Register</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add / Edit Product Card -->
+                <div class="card">
+                    <div class="card-header bg-white fw-bold py-3" id="formTitle">2. Add New Product</div>
+                    <div class="card-body">
+                        <input type="hidden" id="productId" />
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Product Name *</label>
+                            <input type="text" id="productName" class="form-control" placeholder="e.g. Wireless Mouse Pro" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Description *</label>
+                            <textarea id="productDescription" class="form-control" rows="3" placeholder="Minimum 5 characters..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Price (USD) *</label>
+                            <input type="number" id="productPrice" class="form-control" step="0.01" min="0.01" placeholder="99.99" required />
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success flex-fill" onclick="saveProduct()">Save Product</button>
+                            <button class="btn btn-light border" onclick="resetForm()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Search, Filter & Product Table -->
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header bg-white fw-bold py-3">Search & Filter Products</div>
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label small fw-semibold">Keyword (Name / Description)</label>
+                                <input type="text" id="searchName" class="form-control form-control-sm" placeholder="Search keyword..." />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Min Price</label>
+                                <input type="number" id="searchMinPrice" class="form-control form-control-sm" step="0.01" min="0" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Max Price</label>
+                                <input type="number" id="searchMaxPrice" class="form-control form-control-sm" step="0.01" min="0" />
+                            </div>
+                            <div class="col-md-3 d-flex gap-1">
+                                <button class="btn btn-dark btn-sm flex-fill" onclick="searchProducts()">Filter</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="resetSearch()">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                        <span class="fw-bold">Product Catalog</span>
+                        <span class="badge bg-primary" id="productCount">0 items</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name & Description</th>
+                                    <th class="text-end">Price</th>
+                                    <th>Created</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productTableBody">
+                                <tr><td colspan="5" class="text-center py-4 text-muted">Loading products...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let jwtToken = localStorage.getItem('jwt_token') || '';
+        let currentUser = localStorage.getItem('jwt_user') || '';
+
+        function updateAuthUi() {
+            const badge = document.getElementById('authStatusBadge');
+            const btnLogout = document.getElementById('btnLogout');
+            if (jwtToken) {
+                badge.className = 'badge bg-success badge-auth';
+                badge.textContent = 'Authenticated: ' + currentUser;
+                btnLogout.classList.remove('d-none');
+            } else {
+                badge.className = 'badge bg-secondary badge-auth';
+                badge.textContent = 'Guest (Login required for Create/Edit/Delete)';
+                btnLogout.classList.add('d-none');
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            const container = document.getElementById('alertContainer');
+            container.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+        }
+
+        async function login() {
+            const username = document.getElementById('authUsername').value;
+            const password = document.getElementById('authPassword').value;
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                jwtToken = data.token;
+                currentUser = data.username;
+                localStorage.setItem('jwt_token', jwtToken);
+                localStorage.setItem('jwt_user', currentUser);
+                updateAuthUi();
+                showAlert('Logged in as ' + currentUser + '. You can now add, edit, or delete products.', 'success');
+            } else {
+                showAlert(data.message || 'Login failed.', 'danger');
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('authUsername').value;
+            const email = document.getElementById('authEmail').value || (username + '@@@example.com');
+            const password = document.getElementById('authPassword').value;
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                jwtToken = data.token;
+                currentUser = data.username;
+                localStorage.setItem('jwt_token', jwtToken);
+                localStorage.setItem('jwt_user', currentUser);
+                updateAuthUi();
+                showAlert('Registered and authenticated as ' + currentUser, 'success');
+            } else {
+                showAlert(data.message || JSON.stringify(data.errors || data), 'danger');
+            }
+        }
+
+        function logout() {
+            jwtToken = '';
+            currentUser = '';
+            localStorage.removeItem('jwt_token');
+            localStorage.removeItem('jwt_user');
+            updateAuthUi();
+            showAlert('Logged out.', 'secondary');
+        }
+
+        async function loadProducts(url = '/api/products') {
+            const res = await fetch(url);
+            if (!res.ok) {
+                const err = await res.json();
+                showAlert(err.message || 'Failed to fetch products', 'danger');
+                return;
+            }
+            const products = await res.json();
+            renderTable(products);
+        }
+
+        function renderTable(products) {
+            const tbody = document.getElementById('productTableBody');
+            document.getElementById('productCount').textContent = products.length + ' items';
+            if (!products.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No matching products found.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = products.map(p => `
+                <tr>
+                    <td class="fw-semibold">#${p.id}</td>
+                    <td>
+                        <div class="fw-semibold">${p.name}</div>
+                        <div class="text-muted small">${p.description}</div>
+                    </td>
+                    <td class="text-end fw-bold">$${Number(p.price).toFixed(2)}</td>
+                    <td class="small text-muted">${new Date(p.createdAt).toLocaleDateString()}</td>
+                    <td class="text-end">
+                        <button class="btn btn-outline-primary btn-sm me-1" onclick="populateEdit(${p.id}, '${p.name.replace(/'/g, "\'")}', '${p.description.replace(/'/g, "\'")}', ${p.price})">Edit</button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteProduct(${p.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function searchProducts() {
+            const name = document.getElementById('searchName').value;
+            const minPrice = document.getElementById('searchMinPrice').value;
+            const maxPrice = document.getElementById('searchMaxPrice').value;
+            const params = new URLSearchParams();
+            if (name) params.append('name', name);
+            if (minPrice) params.append('minPrice', minPrice);
+            if (maxPrice) params.append('maxPrice', maxPrice);
+            loadProducts('/api/products/search?' + params.toString());
+        }
+
+        function resetSearch() {
+            document.getElementById('searchName').value = '';
+            document.getElementById('searchMinPrice').value = '';
+            document.getElementById('searchMaxPrice').value = '';
+            loadProducts();
+        }
+
+        function populateEdit(id, name, description, price) {
+            document.getElementById('productId').value = id;
+            document.getElementById('productName').value = name;
+            document.getElementById('productDescription').value = description;
+            document.getElementById('productPrice').value = price;
+            document.getElementById('formTitle').textContent = '2. Edit Product #' + id;
+        }
+
+        function resetForm() {
+            document.getElementById('productId').value = '';
+            document.getElementById('productName').value = '';
+            document.getElementById('productDescription').value = '';
+            document.getElementById('productPrice').value = '';
+            document.getElementById('formTitle').textContent = '2. Add New Product';
+        }
+
+        async function saveProduct() {
+            if (!jwtToken) {
+                showAlert('Please login first to obtain a JWT token before adding or editing products.', 'warning');
+                return;
+            }
+            const id = document.getElementById('productId').value;
+            const payload = {
+                name: document.getElementById('productName').value,
+                description: document.getElementById('productDescription').value,
+                price: parseFloat(document.getElementById('productPrice').value)
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/products/${id}` : '/api/products';
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + jwtToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                resetForm();
+                loadProducts();
+                showAlert(id ? 'Product updated.' : 'Product created.', 'success');
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showAlert(err.message || JSON.stringify(err.errors || err) || 'Operation failed.', 'danger');
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!jwtToken) {
+                showAlert('Please login first before deleting a product.', 'warning');
+                return;
+            }
+            if (!confirm('Delete product #' + id + '?')) return;
+            const res = await fetch(`/api/products/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + jwtToken }
+            });
+            if (res.ok) {
+                loadProducts();
+                showAlert('Product deleted.', 'info');
+            } else {
+                showAlert('Failed to delete product.', 'danger');
+            }
+        }
+
+        updateAuthUi();
+        loadProducts();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
